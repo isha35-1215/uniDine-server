@@ -8,12 +8,7 @@ const port = process.env.PORT || 5000;
 
 
 //middleware
-app.use(cors({
-    origin: [
-        'http://localhost:5173'
-    ],
-    credentials: true
-}));
+app.use(cors());
 app.use(express.json());
 
 
@@ -43,6 +38,7 @@ async function run() {
         const membershipCollection = client.db('UniDineDB').collection('membership')
         const paymentCollection = client.db('UniDineDB').collection('payment')
         const orderCollection = client.db('UniDineDB').collection('orders')
+        const upcomingCollection = client.db('UniDineDB').collection('upcomings')
 
         
         app.post('/users', async (req, res) => {
@@ -58,7 +54,34 @@ async function run() {
             res.send(result);
         });
 
+        app.get('/users', async (req, res) => {
+            const cursor = userCollection.find();
+            const result = await cursor.toArray();
+            res.send(result);
+        })
 
+        app.patch('/users/admin/:id', async(req, res)=>{
+            const id= req.params.id;
+            const filter = { _id : new ObjectId(id)};
+            const updatedDoc = {
+                $set:{
+                    role: 'admin'
+                }
+            }
+            const result = await userCollection.updateOne(filter, updatedDoc);
+            res.send(result);
+        })
+
+        app.get('/users/admin/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email };
+            const user = await userCollection.findOne(query);
+            let admin = false;
+            if (user) {
+              admin = user?.role === 'admin';
+            }
+            res.send({ admin });
+          })
 
 
 
@@ -85,7 +108,60 @@ async function run() {
             res.send(result);
         })
 
+        app.get('/meal', async (req, res) => {
+            const email = req.query.email;
+            const query = { email: email }
+            const result = await mealCollection.find(query).toArray()
+            res.send(result);
+        })
 
+
+        app.put('/upmeals/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) }
+            const options = { upsert: true };
+            const mealInfo = req.body;
+            const item = {
+                $set: {
+                    price: mealInfo.price
+                }
+            }
+            const result = await mealCollection.updateOne(filter, item, options);
+            res.send(result);
+        })
+
+
+        app.delete('/pop/:id', async (req, res) => {
+            const deleteId = req.params.id;
+            console.log(deleteId);
+            const query = { _id: new ObjectId(deleteId) }
+            const result = await mealCollection.deleteOne(query)
+            console.log(result)
+            res.send(result)
+            console.log(query)
+        })
+
+        //upComing Meals
+        app.post('/upcomings', async (req, res) => {
+            const mealData = req.body;
+            console.log('mealData', mealData);
+            const result = await upcomingCollection.insertOne(mealData);
+            res.send(result);
+        })
+
+        app.get('/upcomings', async (req, res) => {
+            const cursor = upcomingCollection.find();
+            const result = await cursor.toArray();
+            res.send(result);
+        })
+
+        app.get('/upcoming/:id', async (req, res) => {
+            const id = req.params.id;
+            console.log(id);
+            const query = { _id: new ObjectId(id) }
+            const result = await upcomingCollection.findOne(query);
+            res.send(result);
+        })
 
         // reviews routes
 
@@ -93,6 +169,12 @@ async function run() {
             const reviewData = req.body;
             console.log('reviewData', reviewData);
             const result = await reviewCollection.insertOne(reviewData);
+            res.send(result);
+        })
+
+        app.get('/allreviews', async (req, res) => {
+            const cursor = reviewCollection.find();
+            const result = await cursor.toArray();
             res.send(result);
         })
 
@@ -153,6 +235,20 @@ async function run() {
             res.send(result);
         })
 
+        app.get('/samelikes', async (req, res) => {
+            const email = req.query.email;
+            const query = { email: email }
+            const result = await likesCollection.find(query).toArray()
+            res.send(result.map((item)=> item.mealID));
+        })
+
+        app.get('/likeCount', async (req, res) => {
+            const mealID = req.query.mealID;
+            const query = { mealID: mealID }
+            const result = await likesCollection.find(query).toArray()
+            res.send(result.map((item)=> item.email));
+        })
+
         app.get('/likes/:mealID', async (req, res) => {
             const mealID = req.params.mealID;
             const likes = await likesCollection.find({ mealID: mealID }).toArray();
@@ -174,7 +270,7 @@ async function run() {
             const name = req.params.name;
             console.log(name);
             const package = await membershipCollection.find({ name: name }).toArray();
-            res.json(package);
+            res.send(package);
         })
 
 
@@ -203,7 +299,6 @@ async function run() {
 
         app.post('/payment', async (req, res) => {
             const payment = req.body;
-            console.log(payment);
             const paymentResult = await paymentCollection.insertOne(payment);
             res.send(paymentResult);
         })
@@ -238,6 +333,12 @@ async function run() {
             res.send(result);
         })
 
+        app.get('/allorder', async (req, res) => {
+            const cursor = orderCollection.find();
+            const result = await cursor.toArray();
+            res.send(result);
+        })
+
         app.delete('/cancel/:id', async (req, res) => {
             const deleteId = req.params.id;
             console.log(deleteId);
@@ -248,6 +349,22 @@ async function run() {
             console.log(query)
         })
 
+        app.put('/status/:id', async (req, res) => {
+            const id = req.params.id;
+            console.log(id);
+            const filter = { _id: new ObjectId(id) }
+            const options = { upsert: true };
+            const statusData = req.body;
+            const item = {
+                $set: {
+                    status: statusData.status
+                }
+            }
+            const result = await orderCollection.updateOne(filter, item, options);
+            res.send(result);
+        })
+
+        
 
 
         // Send a ping to confirm a successful connection
