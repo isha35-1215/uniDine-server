@@ -1,9 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-const app = express();
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-
+const app = express();
 const port = process.env.PORT || 5000;
 
 
@@ -29,7 +28,7 @@ const client = new MongoClient(uri, {
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
-        await client.connect();
+        // await client.connect();
 
         const userCollection = client.db('UniDineDB').collection('users')
         const mealCollection = client.db('UniDineDB').collection('meals')
@@ -40,7 +39,7 @@ async function run() {
         const orderCollection = client.db('UniDineDB').collection('orders')
         const upcomingCollection = client.db('UniDineDB').collection('upcomings')
 
-        
+
         app.post('/users', async (req, res) => {
             const user = req.body;
             // insert email if user doesnt exists: 
@@ -60,11 +59,11 @@ async function run() {
             res.send(result);
         })
 
-        app.patch('/users/admin/:id', async(req, res)=>{
-            const id= req.params.id;
-            const filter = { _id : new ObjectId(id)};
+        app.patch('/users/admin/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
             const updatedDoc = {
-                $set:{
+                $set: {
                     role: 'admin'
                 }
             }
@@ -78,11 +77,32 @@ async function run() {
             const user = await userCollection.findOne(query);
             let admin = false;
             if (user) {
-              admin = user?.role === 'admin';
+                admin = user?.role === 'admin';
             }
             res.send({ admin });
-          })
+        })
 
+
+        app.get('/isOne', async (req, res) => {
+            const email = req.query.email;
+            const name = req.query.name;
+            let query = {};
+            if(email && name){
+                query= {email:email, name:name}
+            }
+            else if(email){
+                query= {email:email}
+            }
+            else if (name){
+                query= {name: name}
+            }
+            else{
+                query= {};
+            }
+            // const query = { email: email, name:name }
+            const result = await userCollection.find(query).toArray()
+            res.send(result);
+        })
 
 
         // meals  routes
@@ -99,6 +119,22 @@ async function run() {
             const result = await cursor.toArray();
             res.send(result);
         })
+
+        // app.get("/allmeals", async (req, res) => {
+        //     const page = parseInt(req.query.page) || 1;
+        //     const itemsPerPage = 10; // Adjust this based on your preference
+
+        //     const skip = (page - 1) * itemsPerPage;
+
+        //     try {
+        //         const cursor = mealCollection.find().skip(skip).limit(itemsPerPage);
+        //         const result = await cursor.toArray();
+        //         res.json(result);
+        //     } catch (error) {
+        //         console.error(error);
+        //         res.status(500).json({ error: "Internal Server Error" });
+        //     }
+        // });
 
         app.get('/mealDetails/:id', async (req, res) => {
             const id = req.params.id;
@@ -123,7 +159,14 @@ async function run() {
             const mealInfo = req.body;
             const item = {
                 $set: {
-                    price: mealInfo.price
+                    price: mealInfo.price,
+                    ingredients: mealInfo.ingredients,
+                    admin: mealInfo.admin,
+                    time: mealInfo.time,
+                    rating: mealInfo.rating,
+                    category: mealInfo.category,
+                    img: mealInfo.img,
+                    description: mealInfo.description
                 }
             }
             const result = await mealCollection.updateOne(filter, item, options);
@@ -239,14 +282,14 @@ async function run() {
             const email = req.query.email;
             const query = { email: email }
             const result = await likesCollection.find(query).toArray()
-            res.send(result.map((item)=> item.mealID));
+            res.send(result.map((item) => item.mealID));
         })
 
         app.get('/likeCount', async (req, res) => {
             const mealID = req.query.mealID;
             const query = { mealID: mealID }
             const result = await likesCollection.find(query).toArray()
-            res.send(result.map((item)=> item.email));
+            res.send(result.map((item) => item.email));
         })
 
         app.get('/likes/:mealID', async (req, res) => {
@@ -294,7 +337,7 @@ async function run() {
         });
 
 
-       
+
         //package purchase for membership
 
         app.post('/payment', async (req, res) => {
@@ -305,14 +348,14 @@ async function run() {
 
         app.get('/payment', async (req, res) => {
             const email = req.query.email;
-            const result = await paymentCollection.find({email:email}).toArray();
-            
-            res.send(result.length!==0);
+            const result = await paymentCollection.find({ email: email }).toArray();
+
+            res.send(result.length !== 0);
         })
 
         app.get('/payments', async (req, res) => {
             const email = req.query.email;
-            const query = { email: email}
+            const query = { email: email }
             const result = await paymentCollection.find(query).toArray()
             res.send(result);
         })
@@ -328,7 +371,7 @@ async function run() {
 
         app.get('/orders', async (req, res) => {
             const email = req.query.email;
-            const query = { email: email}
+            const query = { email: email }
             const result = await orderCollection.find(query).toArray()
             res.send(result);
         })
@@ -364,13 +407,14 @@ async function run() {
             res.send(result);
         })
 
-        
+
 
 
         // Send a ping to confirm a successful connection
-        await client.db("admin").command({ ping: 1 });
-        console.log("Pinged your deployment. You successfully connected to MongoDB!");
-    } finally {
+        // await client.db("admin").command({ ping: 1 });
+        // console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    }
+    finally {
         // Ensures that the client will close when you finish/error
         // await client.close();
     }
